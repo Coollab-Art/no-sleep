@@ -74,13 +74,24 @@ class ImplPlatform : public no_sleep::internal::Impl {
 public:
     explicit ImplPlatform(const char* reason)
     {
-        CFStringRef reason_for_activity = CFSTR(reason);
-        _assertion_valid                = IOPMAssertionCreateWithName(kIOPMAssertionTypeNoDisplaySleep, kIOPMAssertionLevelOn, reason_for_activity, &_assertion_id) == kIOReturnSuccess;
+        _reason = CFStringCreateWithCString(
+            kCFAllocatorDefault,  // Default allocator
+            reason,               // The C string to convert
+            kCFStringEncodingUTF8 // The encoding (UTF-8 in this case)
+        );
+        if (_reason == nullptr)
+        {
+            assert(false);
+            return;
+        }
+        _assertion_valid = IOPMAssertionCreateWithName(kIOPMAssertionTypeNoDisplaySleep, kIOPMAssertionLevelOn, _reason, &_assertion_id) == kIOReturnSuccess;
     }
     ~ImplPlatform() override
     {
         if (_assertion_valid)
             IOPMAssertionRelease(_assertion_id);
+        if (_reason != nullptr)
+            CFRelease(_reason);
     }
 
     ImplPlatform(ImplPlatform const&)                = delete;
@@ -91,6 +102,7 @@ public:
 private:
     IOPMAssertionID _assertion_id{};
     bool            _assertion_valid{false};
+    CFStringRef     _reason{nullptr};
 };
 } // namespace
 #endif
