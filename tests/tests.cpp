@@ -3,8 +3,6 @@
 #include <optional>
 #include <quick_imgui/quick_imgui.hpp>
 
-// Learn how to use Dear ImGui: https://coollibs.github.io/contribute/Programming/dear-imgui
-
 auto main(int argc, char* argv[]) -> int
 {
     {
