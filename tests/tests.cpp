@@ -7,6 +7,9 @@
 
 auto main(int argc, char* argv[]) -> int
 {
+    {
+        no_sleep::Scoped _scoped{"Test"};
+    }
     bool const should_run_imgui_tests = argc < 2 || strcmp(argv[1], "-nogpu") != 0; // NOLINT(*pointer-arithmetic)
     if (!should_run_imgui_tests)
         return 0;
