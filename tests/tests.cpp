@@ -20,7 +20,7 @@ auto main(int argc, char* argv[]) -> int
         if (ImGui::Checkbox("Sleep not allowed", &sleep_not_allowed))
         {
             if (sleep_not_allowed)
-                scope1.emplace();
+                scope1.emplace("MyApp is exporting a video");
             else
                 scope1.reset();
         }
@@ -28,7 +28,7 @@ auto main(int argc, char* argv[]) -> int
         if (ImGui::Checkbox("Sleep not allowed2", &sleep_not_allowed2))
         {
             if (sleep_not_allowed2)
-                scope2.emplace();
+                scope2.emplace("MyApp is exporting a video");
             else
                 scope2.reset();
         }
