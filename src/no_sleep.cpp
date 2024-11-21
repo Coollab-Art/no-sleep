@@ -25,11 +25,11 @@ static auto previous_execution_state() -> EXECUTION_STATE&
 namespace {
 class ImplPlatform : public no_sleep::internal::Impl {
 public:
-    explicit ImplPlatform(const char* /* app_name */, const char* /* reason */, Mode mode)
+    explicit ImplPlatform(const char* /* app_name */, const char* /* reason */, no_sleep::Mode mode)
     {
         std::lock_guard<std::mutex> _{ref_count_mutex()};
         if (ref_count() == 0)
-            previous_execution_state() = SetThreadExecutionState(ES_CONTINUOUS | ES_SYSTEM_REQUIRED | ES_DISPLAY_REQUIRED);
+            previous_execution_state() = SetThreadExecutionState(ES_CONTINUOUS | (mode == no_sleep::Mode::KeepScreenOnAndKeepComputing ? ES_DISPLAY_REQUIRED : ES_SYSTEM_REQUIRED));
         ref_count()++;
     }
     ~ImplPlatform() override
@@ -37,7 +37,7 @@ public:
         std::lock_guard<std::mutex> _{ref_count_mutex()};
         assert(ref_count() > 0);
         ref_count()--;
-        if (ref_count() == 0)
+        if (ref_count() == 0 && previous_execution_state() != 0) //  previous_execution_state() == 0 when the previous call to SetThreadExecutionState failed
             SetThreadExecutionState(previous_execution_state());
     }
 
@@ -52,7 +52,7 @@ public:
 namespace {
 class ImplPlatform : public no_sleep::internal::Impl {
 public:
-    explicit ImplPlatform(const char* app_name, const char* reason, Mode mode)
+    explicit ImplPlatform(const char* app_name, const char* reason, no_sleep::Mode mode)
     {
         DBusConnection* connection = dbus_bus_get(DBUS_BUS_SYSTEM, nullptr);
         if (!connection)
@@ -62,7 +62,7 @@ public:
         if (!message)
             return;
 
-        const char* arg1 = mode == Mode::KeepScreenOn ? "idle" : "sleep";
+        const char* arg1 = mode == no_sleep::Mode::KeepScreenOnAndKeepComputing ? "idle" : "sleep";
         const char* arg2 = app_name;
         const char* arg3 = reason;
         const char* arg4 = "block";
@@ -117,7 +117,7 @@ private:
 namespace {
 class ImplPlatform : public no_sleep::internal::Impl {
 public:
-    explicit ImplPlatform(const char* /* app_name */, const char* reason, Mode mode)
+    explicit ImplPlatform(const char* /* app_name */, const char* reason, no_sleep::Mode mode)
     {
         _reason = CFStringCreateWithCString(
             kCFAllocatorDefault,  // Default allocator
@@ -129,7 +129,7 @@ public:
             assert(false);
             return;
         }
-        _assertion_valid = IOPMAssertionCreateWithName(kIOPMAssertionTypeNoDisplaySleep, kIOPMAssertionLevelOn, _reason, &_assertion_id) == kIOReturnSuccess;
+        _assertion_valid = IOPMAssertionCreateWithName(mode == no_sleep::Mode::KeepScreenOnAndKeepComputing ? kIOPMAssertionTypeNoDisplaySleep : kIOPMAssertionTypeNoIdleSleep, kIOPMAssertionLevelOn, _reason, &_assertion_id) == kIOReturnSuccess;
     }
     ~ImplPlatform() override
     {

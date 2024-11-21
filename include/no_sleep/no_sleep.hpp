@@ -16,7 +16,7 @@ public:
 } // namespace internal
 
 enum class Mode {
-    KeepScreenOn,
+    KeepScreenOnAndKeepComputing,
     ScreenCanTurnOffButKeepComputing,
 };
 
