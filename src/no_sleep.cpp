@@ -1,5 +1,6 @@
 #include "no_sleep/no_sleep.hpp"
 #include <cassert>
+#include <cstring>
 
 #if defined(_WIN32)
 #include <mutex>
@@ -66,15 +67,15 @@ public:
 } // namespace
 #endif
 #if defined(__APPLE__)
-#import <IOKit/pwr_mgt/IOPMLib.h>
+#include <IOKit/pwr_mgt/IOPMLib.h>
 
 namespace {
 class ImplPlatform : public no_sleep::internal::Impl {
 public:
     explicit ImplPlatform(const char* reason)
     {
-        CFStringRef reasonForActivity = CFSTR(reason);
-        assertion_valid               = IOPMAssertionCreateWithName(kIOPMAssertionTypeNoDisplaySleep, kIOPMAssertionLevelOn, reasonForActivity, &_assertion_id) == kIOReturnSuccess;
+        CFStringRef reason_for_activity = CFSTR(reason);
+        _assertion_valid                = IOPMAssertionCreateWithName(kIOPMAssertionTypeNoDisplaySleep, kIOPMAssertionLevelOn, reason_for_activity, &_assertion_id) == kIOReturnSuccess;
     }
     ~ImplPlatform() override
     {
