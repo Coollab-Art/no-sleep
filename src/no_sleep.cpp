@@ -126,7 +126,10 @@ public:
             DBusMessageIter reply_iter;
             dbus_message_iter_init(reply, &reply_iter);
 
-            if (dbus_message_iter_get_arg_type(&reply_iter) == DBUS_TYPE_UNIX_FD)
+            int const arg_type = dbus_message_iter_get_arg_type(&reply_iter);
+            if (arg_type == DBUS_TYPE_UNIX_FD)
+                dbus_message_iter_get_basic(&reply_iter, &inhibit_fd);
+            else if (arg_type == DBUS_TYPE_INT32)
                 dbus_message_iter_get_basic(&reply_iter, &inhibit_fd);
             else
                 assert(false);
