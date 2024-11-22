@@ -76,9 +76,9 @@ jobs:
         if: runner.os == 'Linux'
         run: sudo apt-get install -y libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev mesa-common-dev
 
-      #   - name: Install DBUS dependencies for Linux
-      #     if: runner.os == 'Linux'
-      #     run: sudo apt-get install -y libdbus-1-dev libdbus-glib-1-2 libdbus-glib-1-dev
+      - name: Install DBUS dependencies for Linux
+        if: runner.os == 'Linux'
+        run: sudo apt-get install -y libdbus-1-dev
 
       - name: Build
         uses: lukka/run-cmake@v3
