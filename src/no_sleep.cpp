@@ -128,6 +128,9 @@ public:
 
             if (dbus_message_iter_get_arg_type(&reply_iter) == DBUS_TYPE_UNIX_FD)
                 dbus_message_iter_get_basic(&reply_iter, &inhibit_fd);
+            else
+                assert(false);
+            assert(inhibit_fd >= 0);
 
             dbus_message_unref(reply);
         }
@@ -138,7 +141,6 @@ public:
 
         dbus_pending_call_unref(pending);
         dbus_connection_unref(connection);
-        assert(inhibit_fd >= 0);
     }
 
     ~ImplPlatform() override
