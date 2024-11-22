@@ -34,7 +34,7 @@ endif()
 
 # ---Add DBus lib---
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
-    list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}")
+    list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}")
     find_package(Dbus1 REQUIRED)
     target_link_libraries(no_sleep PRIVATE DBus1::DBus)
 endif()
