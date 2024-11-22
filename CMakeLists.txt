@@ -31,3 +31,9 @@ if(WARNINGS_AS_ERRORS_FOR_NO_SLEEP)
         target_compile_options(no_sleep PRIVATE -Werror)
     endif()
 endif()
+
+# ---Add DBus lib---
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    find_package(Dbus1 REQUIRED)
+    target_link_libraries(no_sleep PRIVATE DBus1::DBus)
+endif()
