@@ -73,6 +73,7 @@ private:
 #endif
 #if defined(__linux__)
 #include <dbus/dbus.h>
+#include <unistd.h>
 
 namespace {
 class ImplPlatform : public no_sleep::internal::Impl {
