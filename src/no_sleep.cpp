@@ -138,14 +138,13 @@ public:
 
         dbus_pending_call_unref(pending);
         dbus_connection_unref(connection);
+        assert(inhibit_fd >= 0);
     }
 
     ~ImplPlatform() override
     {
         if (inhibit_fd >= 0)
             close(inhibit_fd);
-        else
-            assert(false);
     }
 
     ImplPlatform(ImplPlatform const&)                = delete;
