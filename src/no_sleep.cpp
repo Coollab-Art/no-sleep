@@ -52,11 +52,13 @@ public:
 
     void set_thread_execution_state()
     {
-        SetThreadExecutionState(
+        auto const res = SetThreadExecutionState(
             ES_CONTINUOUS
             | (display_required_count() > 0 ? ES_DISPLAY_REQUIRED : 0)
             | (system_required_count() > 0 ? ES_SYSTEM_REQUIRED : 0)
         );
+        assert(res != 0);
+        std::ignore = res;
     }
 
     auto count_for_current_mode() -> int&
@@ -82,11 +84,17 @@ public:
     {
         DBusConnection* connection = dbus_bus_get(DBUS_BUS_SYSTEM, nullptr);
         if (!connection)
+        {
+            assert(false);
             return;
+        }
 
         DBusMessage* message = dbus_message_new_method_call("org.freedesktop.login1", "/org/freedesktop/login1", "org.freedesktop.login1.Manager", "Inhibit");
         if (!message)
+        {
+            assert(false);
             return;
+        }
 
         const char* arg1 = mode == no_sleep::Mode::KeepScreenOnAndKeepComputing ? "idle" : "sleep";
         const char* arg2 = app_name;
@@ -96,11 +104,17 @@ public:
         DBusMessageIter args;
         dbus_message_iter_init_append(message, &args);
         if (!dbus_message_iter_append_basic(&args, DBUS_TYPE_STRING, &arg1) || !dbus_message_iter_append_basic(&args, DBUS_TYPE_STRING, &arg2) || !dbus_message_iter_append_basic(&args, DBUS_TYPE_STRING, &arg3) || !dbus_message_iter_append_basic(&args, DBUS_TYPE_STRING, &arg4))
+        {
+            assert(false);
             return;
+        }
 
         DBusPendingCall* pending;
         if (!dbus_connection_send_with_reply(connection, message, &pending, -1))
+        {
+            assert(false);
             return;
+        }
 
         dbus_connection_flush(connection);
         dbus_message_unref(message);
@@ -117,6 +131,10 @@ public:
 
             dbus_message_unref(reply);
         }
+        else
+        {
+            assert(false);
+        }
 
         dbus_pending_call_unref(pending);
         dbus_connection_unref(connection);
@@ -126,6 +144,8 @@ public:
     {
         if (inhibit_fd >= 0)
             close(inhibit_fd);
+        else
+            assert(false);
     }
 
     ImplPlatform(ImplPlatform const&)                = delete;
@@ -157,6 +177,7 @@ public:
             return;
         }
         _assertion_valid = IOPMAssertionCreateWithName(mode == no_sleep::Mode::KeepScreenOnAndKeepComputing ? kIOPMAssertionTypeNoDisplaySleep : kIOPMAssertionTypeNoIdleSleep, kIOPMAssertionLevelOn, _reason, &_assertion_id) == kIOReturnSuccess;
+        assert(_assertion_valid);
     }
 
     ~ImplPlatform() override
