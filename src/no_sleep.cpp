@@ -6,19 +6,19 @@
 #include <mutex>
 #include "windows.h"
 
-static auto ref_count() -> int&
+static auto display_required_count() -> int&
 {
     static int instance{0};
     return instance;
 }
-static auto ref_count_mutex() -> std::mutex&
+static auto system_required_count() -> int&
+{
+    static int instance{0};
+    return instance;
+}
+static auto mutex() -> std::mutex&
 {
     static std::mutex instance{};
-    return instance;
-};
-static auto previous_execution_state() -> EXECUTION_STATE&
-{
-    static EXECUTION_STATE instance{};
     return instance;
 };
 
@@ -26,25 +26,48 @@ namespace {
 class ImplPlatform : public no_sleep::internal::Impl {
 public:
     explicit ImplPlatform(const char* /* app_name */, const char* /* reason */, no_sleep::Mode mode)
+        : _mode{mode}
     {
-        std::lock_guard<std::mutex> _{ref_count_mutex()};
-        if (ref_count() == 0)
-            previous_execution_state() = SetThreadExecutionState(ES_CONTINUOUS | (mode == no_sleep::Mode::KeepScreenOnAndKeepComputing ? ES_DISPLAY_REQUIRED : ES_SYSTEM_REQUIRED));
-        ref_count()++;
+        std::lock_guard<std::mutex> lock{mutex()};
+
+        count_for_current_mode()++;
+        if (count_for_current_mode() == 1)
+            set_thread_execution_state();
     }
+
     ~ImplPlatform() override
     {
-        std::lock_guard<std::mutex> _{ref_count_mutex()};
-        assert(ref_count() > 0);
-        ref_count()--;
-        if (ref_count() == 0 && previous_execution_state() != 0) //  previous_execution_state() == 0 when the previous call to SetThreadExecutionState failed
-            SetThreadExecutionState(previous_execution_state());
+        std::lock_guard<std::mutex> lock{mutex()};
+
+        assert(count_for_current_mode() > 0);
+        count_for_current_mode()--;
+        if (count_for_current_mode() == 0)
+            set_thread_execution_state();
     }
 
     ImplPlatform(ImplPlatform const&)                = delete;
     ImplPlatform& operator=(ImplPlatform const&)     = delete;
     ImplPlatform(ImplPlatform&&) noexcept            = delete;
     ImplPlatform& operator=(ImplPlatform&&) noexcept = delete;
+
+    void set_thread_execution_state()
+    {
+        SetThreadExecutionState(
+            ES_CONTINUOUS
+            | (display_required_count() > 0 ? ES_DISPLAY_REQUIRED : 0)
+            | (system_required_count() > 0 ? ES_SYSTEM_REQUIRED : 0)
+        );
+    }
+
+    auto count_for_current_mode() -> int&
+    {
+        return _mode == no_sleep::Mode::KeepScreenOnAndKeepComputing
+                   ? display_required_count()
+                   : system_required_count();
+    }
+
+private:
+    no_sleep::Mode _mode;
 };
 } // namespace
 #endif
@@ -95,6 +118,7 @@ public:
         dbus_pending_call_unref(pending);
         dbus_connection_unref(connection);
     }
+
     ~ImplPlatform() override
     {
         if (inhibit_fd >= 0)
@@ -131,6 +155,7 @@ public:
         }
         _assertion_valid = IOPMAssertionCreateWithName(mode == no_sleep::Mode::KeepScreenOnAndKeepComputing ? kIOPMAssertionTypeNoDisplaySleep : kIOPMAssertionTypeNoIdleSleep, kIOPMAssertionLevelOn, _reason, &_assertion_id) == kIOReturnSuccess;
     }
+
     ~ImplPlatform() override
     {
         if (_assertion_valid)
