@@ -78,7 +78,7 @@ jobs:
 
       - name: Install DBUS dependencies for Linux
         if: runner.os == 'Linux'
-        run: sudo apt-get install -y libdbus-1-dev
+        run: sudo apt-get install -y libdbus-1-dev libdbus-glib-1-2 libdbus-glib-1-dev
 
       - name: Build
         uses: lukka/run-cmake@v3
