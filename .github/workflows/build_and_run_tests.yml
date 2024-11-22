@@ -49,11 +49,11 @@ jobs:
               os: macos-latest,
               cmake_configure_args: -D CMAKE_C_COMPILER=clang -D CMAKE_CXX_COMPILER=clang++,
             }
-#           - {
-#               name: MacOS GCC,
-#               os: macos-latest,
-#               cmake_configure_args: -D CMAKE_C_COMPILER=gcc -D CMAKE_CXX_COMPILER=g++,
-#             }
+        #           - {
+        #               name: MacOS GCC,
+        #               os: macos-latest,
+        #               cmake_configure_args: -D CMAKE_C_COMPILER=gcc -D CMAKE_CXX_COMPILER=g++,
+        #             }
         build_type:
           - Debug
           - Release
@@ -75,6 +75,10 @@ jobs:
       - name: Install GLFW dependencies for Linux
         if: runner.os == 'Linux'
         run: sudo apt-get install -y libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev mesa-common-dev
+
+      - name: Install DBUS dependencies for Linux
+        if: runner.os == 'Linux'
+        run: sudo apt-get install -y libdbus-1-dev
 
       - name: Build
         uses: lukka/run-cmake@v3
