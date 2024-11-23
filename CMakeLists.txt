@@ -16,6 +16,14 @@ endif()
 file(GLOB_RECURSE SRC_FILES CONFIGURE_DEPENDS src/*.cpp)
 target_sources(no_sleep PRIVATE ${SRC_FILES})
 
+# ---Add DBus lib---
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}")
+    find_package(Dbus1 REQUIRED)
+    target_include_directories(no_sleep PRIVATE ${DBUS_INCLUDE_DIRS})
+    target_link_libraries(no_sleep PRIVATE ${DBUS_LIBRARIES})
+endif()
+
 # ---Set warning level---
 if(MSVC)
     target_compile_options(no_sleep PRIVATE /W4)
@@ -30,12 +38,4 @@ if(WARNINGS_AS_ERRORS_FOR_NO_SLEEP)
     else()
         target_compile_options(no_sleep PRIVATE -Werror)
     endif()
-endif()
-
-# ---Add DBus lib---
-if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
-    list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}")
-    find_package(Dbus1 REQUIRED)
-    target_include_directories(no_sleep PRIVATE ${DBUS_INCLUDE_DIRS})
-    target_link_libraries(no_sleep PRIVATE ${DBUS_LIBRARIES})
 endif()

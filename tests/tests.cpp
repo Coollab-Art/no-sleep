@@ -1,4 +1,8 @@
 #include <imgui.h>
+#include <chrono>
+#include <ctime>
+#include <iomanip>
+#include <iostream>
 #include <no_sleep/no_sleep.hpp>
 #include <optional>
 #include <quick_imgui/quick_imgui.hpp>
@@ -20,28 +24,50 @@ auto main(int argc, char* argv[]) -> int
 
     quick_imgui::AverageTime average_time{};
 
+    int prev_sec{};
+
     quick_imgui::loop("no_sleep tests", [&]() { // Open a window and run all the ImGui-related code
         ImGui::Begin("no_sleep tests");
-        average_time.stop();
         average_time.start();
-        bool sleep_not_allowed = scope1.has_value();
-        if (ImGui::Checkbox("Keep screen on and keep computing", &sleep_not_allowed))
+
         {
-            if (sleep_not_allowed)
-                scope1.emplace("MyApp", "MyApp is exporting a video", no_sleep::Mode::KeepScreenOnAndKeepComputing);
-            else
-                scope1.reset();
+            bool sleep_not_allowed = scope1.has_value();
+            if (ImGui::Checkbox("Keep screen on and keep computing", &sleep_not_allowed))
+            {
+                if (sleep_not_allowed)
+                    scope1.emplace("MyApp", "MyApp is exporting a video", no_sleep::Mode::KeepScreenOnAndKeepComputing);
+                else
+                    scope1.reset();
+            }
         }
-        bool sleep_not_allowed2 = scope2.has_value();
-        if (ImGui::Checkbox("Screen can turn off but keep computing", &sleep_not_allowed2))
+
         {
-            if (sleep_not_allowed2)
-                scope2.emplace("MyApp", "MyApp is doing some long computation", no_sleep::Mode::ScreenCanTurnOffButKeepComputing);
-            else
-                scope2.reset();
+            bool sleep_not_allowed = scope2.has_value();
+            if (ImGui::Checkbox("Screen can turn off but keep computing", &sleep_not_allowed))
+            {
+                if (sleep_not_allowed)
+                    scope2.emplace("MyApp", "MyApp is doing some long computation", no_sleep::Mode::ScreenCanTurnOffButKeepComputing);
+                else
+                    scope2.reset();
+            }
         }
+
+        average_time.stop();
         average_time.imgui_plot();
         ImGui::End();
+
+        // Output the current hour, minute, and second
+        std::time_t const    current_time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+        std::tm const* const local_time   = std::localtime(&current_time);
+        if (prev_sec != local_time->tm_sec)
+        {
+            prev_sec = local_time->tm_sec;
+            std::cout << "Current time: "
+                      << std::setfill('0') << std::setw(2) << local_time->tm_hour << ":"
+                      << std::setfill('0') << std::setw(2) << local_time->tm_min << ":"
+                      << std::setfill('0') << std::setw(2) << local_time->tm_sec
+                      << '\n';
+        }
     });
 
     return 0;
