@@ -25,7 +25,7 @@ static auto mutex() -> std::mutex&
 namespace {
 class ImplPlatform : public no_sleep::internal::Impl {
 public:
-    explicit ImplPlatform(const char* /* app_name */, const char* /* reason */, no_sleep::Mode mode)
+    ImplPlatform(const char* /* app_name */, const char* /* reason */, no_sleep::Mode mode)
         : _mode{mode}
     {
         std::lock_guard<std::mutex> lock{mutex()};
@@ -75,81 +75,94 @@ private:
 #endif
 #if defined(__linux__)
 #include <dbus/dbus.h>
-#include <unistd.h>
+#include <iostream>
+
+#define ERR_PREFIX "[no_sleep] Failed to prevent screen from sleeping: " // NOLINT(*macro-usage)
 
 namespace {
 class ImplPlatform : public no_sleep::internal::Impl {
 public:
-    explicit ImplPlatform(const char* app_name, const char* reason, no_sleep::Mode mode)
+    ImplPlatform(const char* app_name, const char* reason, no_sleep::Mode /*mode*/) // NOLINT(*member-init)
     {
-        DBusConnection* connection = dbus_bus_get(DBUS_BUS_SYSTEM, nullptr);
-        if (!connection)
+        // TODO: we don't handle `mode` because I couldn't figure out how to implement ScreenCanTurnOffButKeepComputing
+        // So we always do KeepScreenOnAndKeepComputing
+
+        DBusError error;
+        dbus_error_init(&error);
+
+        _connection = dbus_bus_get(DBUS_BUS_SESSION, &error); // NOLINT(*prefer-member-initializer)
+        if (dbus_error_is_set(&error))
         {
-            assert(false);
+            assert(_connection == nullptr);
+            std::cerr << ERR_PREFIX "Error connecting to the D-Bus session bus: " << error.message << '\n';
+            dbus_error_free(&error);
             return;
         }
 
-        DBusMessage* message = dbus_message_new_method_call("org.freedesktop.login1", "/org/freedesktop/login1", "org.freedesktop.login1.Manager", "Inhibit");
-        if (!message)
+        DBusMessage* const msg = dbus_message_new_method_call(
+            "org.freedesktop.ScreenSaver",
+            "/org/freedesktop/ScreenSaver",
+            "org.freedesktop.ScreenSaver",
+            "Inhibit"
+        );
+        if (!msg)
         {
-            assert(false);
+            std::cerr << ERR_PREFIX "Failed to create DBus message\n";
+            free_connection();
             return;
         }
 
-        const char* arg1 = mode == no_sleep::Mode::KeepScreenOnAndKeepComputing ? "idle" : "sleep";
-        const char* arg2 = app_name;
-        const char* arg3 = reason;
-        const char* arg4 = "block";
+        dbus_message_append_args(msg, DBUS_TYPE_STRING, &app_name, DBUS_TYPE_STRING, &reason, DBUS_TYPE_INVALID);
 
-        DBusMessageIter args;
-        dbus_message_iter_init_append(message, &args);
-        if (!dbus_message_iter_append_basic(&args, DBUS_TYPE_STRING, &arg1) || !dbus_message_iter_append_basic(&args, DBUS_TYPE_STRING, &arg2) || !dbus_message_iter_append_basic(&args, DBUS_TYPE_STRING, &arg3) || !dbus_message_iter_append_basic(&args, DBUS_TYPE_STRING, &arg4))
+        DBusMessage* const reply = dbus_connection_send_with_reply_and_block(_connection, msg, -1, &error);
+        dbus_message_unref(msg);
+
+        if (dbus_error_is_set(&error))
         {
-            assert(false);
+            std::cerr << ERR_PREFIX "Error sending DBus message: " << error.message << '\n';
+            dbus_error_free(&error);
+            free_connection();
             return;
         }
 
-        DBusPendingCall* pending;
-        if (!dbus_connection_send_with_reply(connection, message, &pending, -1))
+        if (!dbus_message_get_args(reply, &error, DBUS_TYPE_UINT32, &_cookie, DBUS_TYPE_INVALID))
         {
-            assert(false);
-            return;
-        }
-
-        dbus_connection_flush(connection);
-        dbus_message_unref(message);
-        dbus_pending_call_block(pending);
-
-        DBusMessage* reply = dbus_pending_call_steal_reply(pending);
-        if (reply)
-        {
-            DBusMessageIter reply_iter;
-            dbus_message_iter_init(reply, &reply_iter);
-
-            int const arg_type = dbus_message_iter_get_arg_type(&reply_iter);
-            if (arg_type == DBUS_TYPE_UNIX_FD)
-                dbus_message_iter_get_basic(&reply_iter, &inhibit_fd);
-            else if (arg_type == DBUS_TYPE_INT32)
-                dbus_message_iter_get_basic(&reply_iter, &inhibit_fd);
-            else
-                assert(false);
-            assert(inhibit_fd >= 0);
-
+            std::cerr << ERR_PREFIX "Error reading reply: " << error.message << '\n';
+            dbus_error_free(&error);
             dbus_message_unref(reply);
-        }
-        else
-        {
-            assert(false);
+            free_connection();
+            return;
         }
 
-        dbus_pending_call_unref(pending);
-        dbus_connection_unref(connection);
+        dbus_message_unref(reply);
+        _has_been_init = true;
     }
 
     ~ImplPlatform() override
     {
-        if (inhibit_fd >= 0)
-            close(inhibit_fd);
+        if (!_has_been_init)
+            return;
+
+        DBusMessage* const msg = dbus_message_new_method_call(
+            "org.freedesktop.ScreenSaver",
+            "/org/freedesktop/ScreenSaver",
+            "org.freedesktop.ScreenSaver",
+            "UnInhibit"
+        );
+        if (!msg)
+        {
+            std::cerr << ERR_PREFIX "Failed to create DBus message for UnInhibit\n";
+            free_connection();
+            return;
+        }
+
+        dbus_message_append_args(msg, DBUS_TYPE_UINT32, &_cookie, DBUS_TYPE_INVALID);
+
+        if (!dbus_connection_send(_connection, msg, nullptr))
+            std::cerr << ERR_PREFIX "Failed to send UnInhibit message\n";
+
+        dbus_message_unref(msg);
+        free_connection();
     }
 
     ImplPlatform(ImplPlatform const&)                = delete;
@@ -158,9 +171,18 @@ public:
     ImplPlatform& operator=(ImplPlatform&&) noexcept = delete;
 
 private:
-    int inhibit_fd = -1;
+    void free_connection()
+    {
+        dbus_connection_unref(_connection);
+    }
+
+private:
+    dbus_uint32_t   _cookie;
+    DBusConnection* _connection;
+    bool            _has_been_init{false};
 };
 } // namespace
+#undef ERR_PREFIX
 #endif
 #if defined(__APPLE__)
 #include <IOKit/pwr_mgt/IOPMLib.h>
@@ -168,7 +190,7 @@ private:
 namespace {
 class ImplPlatform : public no_sleep::internal::Impl {
 public:
-    explicit ImplPlatform(const char* /* app_name */, const char* reason, no_sleep::Mode mode)
+    ImplPlatform(const char* /* app_name */, const char* reason, no_sleep::Mode mode)
     {
         _reason = CFStringCreateWithCString(
             kCFAllocatorDefault,  // Default allocator

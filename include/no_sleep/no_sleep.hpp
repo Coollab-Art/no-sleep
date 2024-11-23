@@ -23,7 +23,7 @@ enum class Mode {
 /// Prevents the computer from going to sleep as long as at least one of these objects is alive
 class Scoped {
 public:
-    explicit Scoped(const char* app_name, const char* reason, Mode mode);
+    Scoped(const char* app_name, const char* reason, Mode mode);
 
 private:
     std::shared_ptr<internal::Impl> _pimpl;
