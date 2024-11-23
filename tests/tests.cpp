@@ -1,3 +1,4 @@
+#define _CRT_SECURE_NO_WARNINGS // Disable warning about std::localtime
 #include <imgui.h>
 #include <chrono>
 #include <ctime>
@@ -26,7 +27,7 @@ auto main(int argc, char* argv[]) -> int
 
     int prev_sec{};
 
-    quick_imgui::loop("no_sleep tests", [&]() { // Open a window and run all the ImGui-related code
+    quick_imgui::loop("no_sleep tests", [&]() {
         ImGui::Begin("no_sleep tests");
         average_time.start();
 
